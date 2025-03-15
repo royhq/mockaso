@@ -23,3 +23,22 @@ func Path(path string) URLMatcher {
 		return url.Path == strings.TrimSuffix(path, "/")
 	}
 }
+
+func defaultMatchers(method string, url URLMatcher) []requestMatcherFunc {
+	return []requestMatcherFunc{
+		methodMatcher(method),
+		urlMatcher(url),
+	}
+}
+
+func methodMatcher(method string) requestMatcherFunc {
+	return func(_ *stub, r *http.Request) bool {
+		return r.Method == method
+	}
+}
+
+func urlMatcher(matcher URLMatcher) requestMatcherFunc {
+	return func(_ *stub, r *http.Request) bool {
+		return matcher(r.URL)
+	}
+}
