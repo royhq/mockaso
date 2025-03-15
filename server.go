@@ -1,12 +1,14 @@
 package mockaso
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 )
 
 type Server struct {
 	server *httptest.Server
+	stubs  []*stub
 	logger Logger
 }
 
@@ -44,6 +46,15 @@ func (s *Server) MustShutdown() {
 	}
 }
 
+func (s *Server) Clear() {
+	if s.server == nil {
+		return
+	}
+
+	s.server.Close()
+	s.logger.Logf("server cleared at %s", s.server.URL)
+}
+
 func (s *Server) URL() string {
 	if s.server == nil {
 		return ""
@@ -56,18 +67,36 @@ func (s *Server) TestServer() *httptest.Server {
 	return s.server
 }
 
-func (s *Server) Clear() {
+func (s *Server) Client() *http.Client {
 	if s.server == nil {
-		return
+		return nil
 	}
 
-	s.server.Close()
-	s.logger.Logf("server cleared at %s", s.server.URL)
+	client := s.server.Client()
+	client.Transport = newTransportWithBaseURL(client.Transport, s.URL())
+
+	return client
+}
+
+func (s *Server) Stub(method string, url URLMatcher) Stub {
+	st := &stub{response: newStubResponse(), matchers: defaultMatchers(method, url)}
+	s.stubs = append(s.stubs, st)
+
+	return st
 }
 
 func (s *Server) newTestServer() *httptest.Server {
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO: complete
+		for _, st := range s.stubs {
+			if st.match(r) {
+				st.write(w)
+				return
+			}
+		}
+
+		// http request does not match with any stub
+		s.logger.Logf("no stub matched for %s %s", r.Method, r.URL.String())
+		writeNoMatch(w, r)
 	})
 
 	return httptest.NewServer(h)
@@ -76,6 +105,7 @@ func (s *Server) newTestServer() *httptest.Server {
 func NewServer(opts ...ServerOption) *Server {
 	server := &Server{
 		logger: &noLogger{},
+		stubs:  make([]*stub, 0),
 	}
 
 	for _, opt := range opts {
@@ -83,6 +113,20 @@ func NewServer(opts ...ServerOption) *Server {
 	}
 
 	return server
+}
+
+func MustStartNewServer(opts ...ServerOption) *Server {
+	server := NewServer(opts...)
+	server.MustStart()
+
+	return server
+}
+
+const demonCode = 666
+
+func writeNoMatch(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(demonCode)
+	_, _ = fmt.Fprintf(w, "no stubs for %s %s", r.Method, r.URL)
 }
 
 type ServerOption func(*Server)
