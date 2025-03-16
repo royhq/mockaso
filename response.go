@@ -35,6 +35,19 @@ func WithRawJSON[T string | []byte | json.RawMessage](raw T) StubResponseRule {
 	}
 }
 
+// WithJSON sets the response content with the marshal output of the given body.
+// The response will include the Content-Type:application/json header.
+func WithJSON(body any) StubResponseRule {
+	return func(r *stubResponse) {
+		data, err := json.Marshal(body)
+		if err != nil {
+			panic(fmt.Errorf("WithJSON err: body marshal failed: %w", err))
+		}
+
+		r.setJSON(data)
+	}
+}
+
 // WithHeader sets a response header.
 // If the key already exists it will be overwritten.
 func WithHeader(key, value string) StubResponseRule {

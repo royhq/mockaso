@@ -3,6 +3,7 @@ package mockaso_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -121,6 +122,122 @@ func TestWithBody(t *testing.T) {
 	})
 }
 
+func TestWithRawJSON(t *testing.T) {
+	t.Parallel()
+
+	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
+	t.Cleanup(server.MustShutdown)
+
+	t.Run("should return the specified json", func(t *testing.T) {
+		testCases := map[string]struct {
+			rule         mockaso.StubResponseRule
+			expectedBody string
+		}{
+			"json raw object as string": {
+				rule:         mockaso.WithRawJSON(json.RawMessage(`{"name":"john","age":57}`)),
+				expectedBody: `{"name":"john","age":57}`,
+			},
+			"object as string": {
+				rule:         mockaso.WithRawJSON(`{"name":"rick","age":39}`),
+				expectedBody: `{"name":"rick","age":39}`,
+			},
+			"object as bytes": {
+				rule:         mockaso.WithRawJSON(`{"name":"carl","age":21}`),
+				expectedBody: `{"name":"carl","age":21}`,
+			},
+		}
+
+		for name, tc := range testCases {
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+
+				url := fmt.Sprintf("/test/with-raw-json/%s", strings.ReplaceAll(name, " ", "-"))
+				server.Stub(http.MethodGet, mockaso.URL(url)).
+					Respond(
+						mockaso.WithStatusCode(http.StatusOK),
+						tc.rule,
+					)
+
+				httpReq, _ := http.NewRequest(http.MethodGet, url, http.NoBody)
+				httpResp, err := server.Client().Do(httpReq)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusOK, httpResp.StatusCode)
+				assert.Equal(t, "application/json", httpResp.Header.Get("Content-Type"))
+				assertBodyString(t, tc.expectedBody, httpResp)
+			})
+		}
+	})
+}
+
+func TestWithJSON(t *testing.T) {
+	t.Parallel()
+
+	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
+	t.Cleanup(server.MustShutdown)
+
+	t.Run("should return the specified json", func(t *testing.T) {
+		testCases := map[string]struct {
+			body         any
+			expectedBody string
+		}{
+			"int": {
+				body:         123,
+				expectedBody: `123`,
+			},
+			"float": {
+				body:         20.87,
+				expectedBody: `20.87`,
+			},
+			"string": {
+				body:         `john`,
+				expectedBody: `"john"`,
+			},
+			"map": {
+				body:         map[string]any{"name": "john", "age": 57},
+				expectedBody: `{"age":57,"name":"john"}`,
+			},
+			"struct": {
+				body:         userResponse{Name: "rick", Age: 39},
+				expectedBody: `{"name":"rick","age":39}`,
+			},
+		}
+
+		for name, tc := range testCases {
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+
+				url := fmt.Sprintf("/test/with-json/%s", strings.ReplaceAll(name, " ", "-"))
+				server.Stub(http.MethodGet, mockaso.URL(url)).
+					Respond(
+						mockaso.WithStatusCode(http.StatusOK),
+						mockaso.WithJSON(tc.body),
+					)
+
+				httpReq, _ := http.NewRequest(http.MethodGet, url, http.NoBody)
+				httpResp, err := server.Client().Do(httpReq)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusOK, httpResp.StatusCode)
+				assert.Equal(t, "application/json", httpResp.Header.Get("Content-Type"))
+				assertBodyString(t, tc.expectedBody, httpResp)
+			})
+		}
+	})
+
+	t.Run("should panic when the json is not valid", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Panics(t, func() {
+			server.Stub(http.MethodGet, mockaso.URL("/test/with-json/panic")).
+				Respond(
+					mockaso.WithStatusCode(http.StatusOK),
+					mockaso.WithJSON(invalidJSON("any")),
+				)
+		})
+	})
+}
+
 func TestWithHeader_And_WithHeaders(t *testing.T) {
 	t.Parallel()
 
@@ -180,55 +297,13 @@ func TestWithHeader_And_WithHeaders(t *testing.T) {
 	})
 }
 
-func TestWithRawJSON(t *testing.T) {
-	t.Parallel()
-
-	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
-	t.Cleanup(server.MustShutdown)
-
-	t.Run("should return the specified json", func(t *testing.T) {
-		testCases := map[string]struct {
-			rule         mockaso.StubResponseRule
-			expectedBody string
-		}{
-			"json raw object as string": {
-				rule:         mockaso.WithRawJSON(json.RawMessage(`{"name":"john","age":57}`)),
-				expectedBody: `{"name":"john","age":57}`,
-			},
-			"object as string": {
-				rule:         mockaso.WithRawJSON(`{"name":"rick","age":39}`),
-				expectedBody: `{"name":"rick","age":39}`,
-			},
-			"object as bytes": {
-				rule:         mockaso.WithRawJSON(`{"name":"carl","age":21}`),
-				expectedBody: `{"name":"carl","age":21}`,
-			},
-		}
-
-		for name, tc := range testCases {
-			t.Run(name, func(t *testing.T) {
-				t.Parallel()
-
-				url := fmt.Sprintf("/test/%s", strings.ReplaceAll(name, " ", "-"))
-				server.Stub(http.MethodGet, mockaso.URL(url)).
-					Respond(
-						mockaso.WithStatusCode(http.StatusOK),
-						tc.rule,
-					)
-
-				httpReq, _ := http.NewRequest(http.MethodGet, url, http.NoBody)
-				httpResp, err := server.Client().Do(httpReq)
-				require.NoError(t, err)
-
-				assert.Equal(t, http.StatusOK, httpResp.StatusCode)
-				assert.Equal(t, "application/json", httpResp.Header.Get("Content-Type"))
-				assertBodyString(t, tc.expectedBody, httpResp)
-			})
-		}
-	})
-}
-
 type userResponse struct {
 	Name string `json:"name"`
 	Age  int    `json:"age"`
+}
+
+type invalidJSON string
+
+func (p invalidJSON) MarshalJSON() ([]byte, error) {
+	return nil, errors.New("invalid json")
 }
