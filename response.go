@@ -31,7 +31,7 @@ func WithBody(body any) StubResponseRule {
 // If the key already exists it will be overwritten.
 func WithHeader(key, value string) StubResponseRule {
 	return func(r *stubResponse) {
-		r.headers[key] = value
+		r.setHeader(key, value)
 	}
 }
 
@@ -40,9 +40,7 @@ func WithHeader(key, value string) StubResponseRule {
 // If any key already exists it will be overwritten.
 func WithHeaders(headers map[string]string) StubResponseRule {
 	return func(r *stubResponse) {
-		for k, v := range headers {
-			r.headers[k] = v
-		}
+		r.setHeaders(headers)
 	}
 }
 
