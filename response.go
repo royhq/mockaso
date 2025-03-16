@@ -30,8 +30,14 @@ func WithBody(body any) StubResponseRule {
 // WithRawJSON sets the response content with the given JSON.
 // The response will include the Content-Type:application/json header.
 func WithRawJSON[T string | []byte | json.RawMessage](raw T) StubResponseRule {
+	data := []byte(raw)
+
+	if !json.Valid(data) {
+		panic(fmt.Errorf("json is not valid: %s", data))
+	}
+
 	return func(r *stubResponse) {
-		r.setJSON([]byte(raw))
+		r.setJSON(data)
 	}
 }
 

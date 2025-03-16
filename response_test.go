@@ -145,6 +145,14 @@ func TestWithRawJSON(t *testing.T) {
 				rule:         mockaso.WithRawJSON(`{"name":"carl","age":21}`),
 				expectedBody: `{"name":"carl","age":21}`,
 			},
+			"raw string": {
+				rule:         mockaso.WithRawJSON(json.RawMessage(`"john"`)),
+				expectedBody: `"john"`,
+			},
+			"string": {
+				rule:         mockaso.WithRawJSON(`"rick"`),
+				expectedBody: `"rick"`,
+			},
 		}
 
 		for name, tc := range testCases {
@@ -165,6 +173,35 @@ func TestWithRawJSON(t *testing.T) {
 				assert.Equal(t, http.StatusOK, httpResp.StatusCode)
 				assert.Equal(t, "application/json", httpResp.Header.Get("Content-Type"))
 				assertBodyString(t, tc.expectedBody, httpResp)
+			})
+		}
+	})
+
+	t.Run("should panic when json is not valid", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := map[string]struct {
+			body string
+		}{
+			"invalid object": {
+				body: `{"name":"john",}`,
+			},
+			"invalid string": {
+				body: `john`,
+			},
+		}
+
+		for name, tc := range testCases {
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+
+				fn := func() {
+					url := fmt.Sprintf("/test/with-raw-json/panic/%s", strings.ReplaceAll(name, " ", "-"))
+					server.Stub(http.MethodGet, mockaso.URL(url)).
+						Respond(mockaso.WithRawJSON(tc.body))
+				}
+
+				assert.Panics(t, fn)
 			})
 		}
 	})
@@ -228,13 +265,12 @@ func TestWithJSON(t *testing.T) {
 	t.Run("should panic when the json is not valid", func(t *testing.T) {
 		t.Parallel()
 
-		assert.Panics(t, func() {
+		fn := func() {
 			server.Stub(http.MethodGet, mockaso.URL("/test/with-json/panic")).
-				Respond(
-					mockaso.WithStatusCode(http.StatusOK),
-					mockaso.WithJSON(invalidJSON("any")),
-				)
-		})
+				Respond(mockaso.WithJSON(invalidJSON("any")))
+		}
+
+		assert.Panics(t, fn)
 	})
 }
 
