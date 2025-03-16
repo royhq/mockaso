@@ -61,47 +61,39 @@ func TestWithBody(t *testing.T) {
 
 	t.Run("should return the specified body", func(t *testing.T) {
 		testCases := map[string]struct {
-			url          string
 			body         any
 			expectedBody string
 		}{
 			"bytes body": {
-				url:          "/test/bytes",
 				body:         []byte("test bytes body"),
 				expectedBody: `test bytes body`,
 			},
 			"string body": {
-				url:          "/test/string",
 				body:         "test string body",
 				expectedBody: `test string body`,
 			},
 			"int body": {
-				url:          "/test/int",
 				body:         123,
 				expectedBody: `123`,
 			},
 			"json raw body": {
-				url:          "/test/json",
 				body:         json.RawMessage(`{"name":"john"}`),
 				expectedBody: `{"name":"john"}`,
 			},
 			"string reader body": {
-				url:          "/test/string-reader",
 				body:         strings.NewReader("string reader body"),
 				expectedBody: `string reader body`,
 			},
 			"buffer body": {
-				url:          "/test/buffer",
 				body:         bytes.NewBuffer([]byte("buffer body")),
 				expectedBody: `buffer body`,
 			},
 			"map body": {
-				url:          "/test/map",
 				body:         map[string]any{"name": "john", "age": 57},
 				expectedBody: `map[age:57 name:john]`,
 			},
 			"struct body": {
-				url:          "/test/struct",
+				//	url:          "/test/struct",
 				body:         userResponse{Name: "john", Age: 57},
 				expectedBody: `{john 57}`,
 			},
@@ -111,13 +103,14 @@ func TestWithBody(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 
-				server.Stub(http.MethodGet, mockaso.URL(tc.url)).
+				url := fmt.Sprintf("/test/%s", strings.ReplaceAll(name, " ", "-"))
+				server.Stub(http.MethodGet, mockaso.URL(url)).
 					Respond(
 						mockaso.WithStatusCode(http.StatusOK),
 						mockaso.WithBody(tc.body),
 					)
 
-				httpReq, _ := http.NewRequest(http.MethodGet, tc.url, http.NoBody)
+				httpReq, _ := http.NewRequest(http.MethodGet, url, http.NoBody)
 				httpResp, err := server.Client().Do(httpReq)
 				require.NoError(t, err)
 
@@ -184,6 +177,54 @@ func TestWithHeader_And_WithHeaders(t *testing.T) {
 			assert.Equal(t, "test value 3", httpResp.Header.Get("X-Test-Header3"))
 			assert.Equal(t, "test value 4", httpResp.Header.Get("X-Test-Header4"))
 		})
+	})
+}
+
+func TestWithRawJSON(t *testing.T) {
+	t.Parallel()
+
+	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
+	t.Cleanup(server.MustShutdown)
+
+	t.Run("should return the specified json", func(t *testing.T) {
+		testCases := map[string]struct {
+			rule         mockaso.StubResponseRule
+			expectedBody string
+		}{
+			"json raw object as string": {
+				rule:         mockaso.WithRawJSON(json.RawMessage(`{"name":"john","age":57}`)),
+				expectedBody: `{"name":"john","age":57}`,
+			},
+			"object as string": {
+				rule:         mockaso.WithRawJSON(`{"name":"rick","age":39}`),
+				expectedBody: `{"name":"rick","age":39}`,
+			},
+			"object as bytes": {
+				rule:         mockaso.WithRawJSON(`{"name":"carl","age":21}`),
+				expectedBody: `{"name":"carl","age":21}`,
+			},
+		}
+
+		for name, tc := range testCases {
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+
+				url := fmt.Sprintf("/test/%s", strings.ReplaceAll(name, " ", "-"))
+				server.Stub(http.MethodGet, mockaso.URL(url)).
+					Respond(
+						mockaso.WithStatusCode(http.StatusOK),
+						tc.rule,
+					)
+
+				httpReq, _ := http.NewRequest(http.MethodGet, url, http.NoBody)
+				httpResp, err := server.Client().Do(httpReq)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusOK, httpResp.StatusCode)
+				assert.Equal(t, "application/json", httpResp.Header.Get("Content-Type"))
+				assertBodyString(t, tc.expectedBody, httpResp)
+			})
+		}
 	})
 }
 

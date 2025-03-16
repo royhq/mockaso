@@ -27,6 +27,14 @@ func WithBody(body any) StubResponseRule {
 	}
 }
 
+// WithRawJSON sets the response content with the given JSON.
+// The response will include the Content-Type:application/json header.
+func WithRawJSON[T string | []byte | json.RawMessage](raw T) StubResponseRule {
+	return func(r *stubResponse) {
+		r.setJSON([]byte(raw))
+	}
+}
+
 // WithHeader sets a response header.
 // If the key already exists it will be overwritten.
 func WithHeader(key, value string) StubResponseRule {

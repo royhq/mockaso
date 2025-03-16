@@ -69,6 +69,11 @@ func (r *stubResponse) setHeaders(headers map[string]string) {
 	}
 }
 
+func (r *stubResponse) setJSON(content []byte) {
+	r.headers["Content-Type"] = "application/json"
+	r.body = content
+}
+
 func newStubResponse() *stubResponse {
 	return &stubResponse{
 		statusCode: http.StatusOK,

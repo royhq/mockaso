@@ -49,11 +49,15 @@ func (s *Server) MustShutdown() {
 }
 
 func (s *Server) Clear() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.stubs = nil
+
 	if s.server == nil {
 		return
 	}
 
-	s.server.Close()
 	s.logger.Logf("server cleared at %s", s.server.URL)
 }
 
