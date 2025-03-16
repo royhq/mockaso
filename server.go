@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 )
 
 type Server struct {
 	server *httptest.Server
 	stubs  []*stub
 	logger Logger
+	mutex  sync.RWMutex
 }
 
 func (s *Server) Start() error {
@@ -79,6 +81,9 @@ func (s *Server) Client() *http.Client {
 }
 
 func (s *Server) Stub(method string, url URLMatcher) Stub {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	st := &stub{response: newStubResponse(), matchers: defaultMatchers(method, url)}
 	s.stubs = append(s.stubs, st)
 
@@ -87,6 +92,9 @@ func (s *Server) Stub(method string, url URLMatcher) Stub {
 
 func (s *Server) newTestServer() *httptest.Server {
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.mutex.RLock()
+		defer s.mutex.RUnlock()
+
 		for _, st := range s.stubs {
 			if st.match(r) {
 				st.write(w)
