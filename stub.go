@@ -45,6 +45,10 @@ func (s *stub) match(r *http.Request) bool {
 }
 
 func (s *stub) write(w http.ResponseWriter) {
+	for k, v := range s.response.headers {
+		w.Header().Set(k, v)
+	}
+
 	w.WriteHeader(s.response.statusCode)
 	_, _ = w.Write(s.response.body)
 }

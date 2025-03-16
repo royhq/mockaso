@@ -128,6 +128,65 @@ func TestWithBody(t *testing.T) {
 	})
 }
 
+func TestWithHeader_And_WithHeaders(t *testing.T) {
+	t.Parallel()
+
+	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
+	t.Cleanup(server.MustShutdown)
+
+	t.Run("WithHeader", func(t *testing.T) {
+		t.Run("should return the specified header", func(t *testing.T) {
+			url := "/test/with-header"
+
+			server.Stub(http.MethodGet, mockaso.URL(url)).
+				Respond(
+					mockaso.WithStatusCode(http.StatusOK),
+					mockaso.WithHeader("X-Test-Header1", "test value 1"),
+					mockaso.WithHeader("X-Test-Header2", "test value 2a"),
+					mockaso.WithHeader("X-Test-Header2", "test value 2b"),
+				)
+
+			httpReq, _ := http.NewRequest(http.MethodGet, url, http.NoBody)
+			httpResp, err := server.Client().Do(httpReq)
+			require.NoError(t, err)
+
+			assert.Equal(t, http.StatusOK, httpResp.StatusCode)
+			assert.Equal(t, "test value 1", httpResp.Header.Get("X-Test-Header1"))
+			assert.Equal(t, "test value 2b", httpResp.Header.Get("X-Test-Header2"))
+		})
+	})
+
+	t.Run("WithHeaders", func(t *testing.T) {
+		t.Run("should return the specified headers", func(t *testing.T) {
+			url := "/test/with-headers"
+
+			server.Stub(http.MethodGet, mockaso.URL(url)).
+				Respond(
+					mockaso.WithStatusCode(http.StatusOK),
+					mockaso.WithHeader("X-Test-Header1", "test value 1"),
+					mockaso.WithHeaders(map[string]string{
+						"X-Test-Header2": "test value 2a",
+						"X-Test-Header3": "test value 3",
+					}),
+					mockaso.WithHeaders(map[string]string{
+						"X-Test-Header2": "test value 2b",
+						"X-Test-Header4": "test value 4",
+					}),
+				)
+
+			httpReq, _ := http.NewRequest(http.MethodGet, url, http.NoBody)
+			httpResp, err := server.Client().Do(httpReq)
+			require.NoError(t, err)
+
+			assert.Equal(t, http.StatusOK, httpResp.StatusCode)
+			assert.Equal(t, "test value 1", httpResp.Header.Get("X-Test-Header1"))
+			assert.Equal(t, "test value 2b", httpResp.Header.Get("X-Test-Header2"))
+			assert.Equal(t, "test value 3", httpResp.Header.Get("X-Test-Header3"))
+			assert.Equal(t, "test value 4", httpResp.Header.Get("X-Test-Header4"))
+		})
+	})
+}
+
 type userResponse struct {
 	Name string `json:"name"`
 	Age  int    `json:"age"`

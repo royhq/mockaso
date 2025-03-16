@@ -27,6 +27,25 @@ func WithBody(body any) StubResponseRule {
 	}
 }
 
+// WithHeader sets a response header.
+// If the key already exists it will be overwritten.
+func WithHeader(key, value string) StubResponseRule {
+	return func(r *stubResponse) {
+		r.headers[key] = value
+	}
+}
+
+// WithHeaders sets a set of response headers.
+// These headers will be added to the already specified headers.
+// If any key already exists it will be overwritten.
+func WithHeaders(headers map[string]string) StubResponseRule {
+	return func(r *stubResponse) {
+		for k, v := range headers {
+			r.headers[k] = v
+		}
+	}
+}
+
 func anyBodyToBytes(body any) ([]byte, error) {
 	switch v := body.(type) {
 	case []byte:
