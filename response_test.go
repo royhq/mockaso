@@ -94,7 +94,6 @@ func TestWithBody(t *testing.T) {
 				expectedBody: `map[age:57 name:john]`,
 			},
 			"struct body": {
-				//	url:          "/test/struct",
 				body:         userResponse{Name: "john", Age: 57},
 				expectedBody: `{john 57}`,
 			},
