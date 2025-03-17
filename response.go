@@ -27,11 +27,38 @@ func WithBody(body any) StubResponseRule {
 	}
 }
 
+// WithRawJSON sets the response content with the given JSON.
+// The response will include the Content-Type:application/json header.
+func WithRawJSON[T string | []byte | json.RawMessage](raw T) StubResponseRule {
+	data := []byte(raw)
+
+	if !json.Valid(data) {
+		panic(fmt.Errorf("json is not valid: %s", data))
+	}
+
+	return func(r *stubResponse) {
+		r.setJSON(data)
+	}
+}
+
+// WithJSON sets the response content with the marshal output of the given body.
+// The response will include the Content-Type:application/json header.
+func WithJSON(body any) StubResponseRule {
+	return func(r *stubResponse) {
+		data, err := json.Marshal(body)
+		if err != nil {
+			panic(fmt.Errorf("WithJSON err: body marshal failed: %w", err))
+		}
+
+		r.setJSON(data)
+	}
+}
+
 // WithHeader sets a response header.
 // If the key already exists it will be overwritten.
 func WithHeader(key, value string) StubResponseRule {
 	return func(r *stubResponse) {
-		r.headers[key] = value
+		r.setHeader(key, value)
 	}
 }
 
@@ -40,9 +67,7 @@ func WithHeader(key, value string) StubResponseRule {
 // If any key already exists it will be overwritten.
 func WithHeaders(headers map[string]string) StubResponseRule {
 	return func(r *stubResponse) {
-		for k, v := range headers {
-			r.headers[k] = v
-		}
+		r.setHeaders(headers)
 	}
 }
 
