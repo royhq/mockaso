@@ -42,3 +42,5 @@ func urlMatcher(matcher URLMatcher) requestMatcherFunc {
 		return matcher(r.URL)
 	}
 }
+
+type StubMatcherRule func() requestMatcherFunc

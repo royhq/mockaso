@@ -4,8 +4,6 @@ import (
 	"net/http"
 )
 
-type StubMatcherRule func() requestMatcherFunc
-
 type Stub interface {
 	StubResponder
 	Match(...StubMatcherRule) StubResponder
