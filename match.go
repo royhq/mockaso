@@ -44,3 +44,13 @@ func urlMatcher(matcher URLMatcher) requestMatcherFunc {
 }
 
 type StubMatcherRule func() requestMatcherFunc
+
+type RequestMatcherFunc func(*http.Request) bool
+
+func MatchRequest(requestMatcher RequestMatcherFunc) StubMatcherRule {
+	matcher := requestMatcherFunc(func(_ *stub, r *http.Request) bool {
+		return requestMatcher(r)
+	})
+
+	return func() requestMatcherFunc { return matcher }
+}

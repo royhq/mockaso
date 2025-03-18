@@ -3,9 +3,11 @@ package mockaso_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/royhq/mockaso"
 )
@@ -82,4 +84,51 @@ func TestPath(t *testing.T) {
 			assert.Equal(t, tc.expectedMatch, matcher(httpReq.URL))
 		})
 	}
+}
+
+func TestMatchRequest(t *testing.T) {
+	t.Parallel()
+
+	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
+	t.Cleanup(server.MustShutdown)
+
+	var calls atomic.Int32
+	matchOnlyJohn := mockaso.RequestMatcherFunc(func(r *http.Request) bool {
+		calls.Add(1)
+		return r.URL.Query().Get("name") == "john"
+	})
+
+	t.Cleanup(func() {
+		assert.Equal(t, int32(2), calls.Load())
+	})
+
+	server.Stub(http.MethodGet, mockaso.Path("/test/match")).
+		Match(
+			mockaso.MatchRequest(matchOnlyJohn),
+		).
+		Respond(
+			mockaso.WithStatusCode(http.StatusOK),
+			mockaso.WithBody("matched request"),
+		)
+
+	t.Run("should return the specified stub when request match", func(t *testing.T) {
+		t.Parallel()
+
+		httpReq, _ := http.NewRequest(http.MethodGet, "/test/match?name=john", http.NoBody)
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, httpResp.StatusCode)
+		assertBodyString(t, "matched request", httpResp)
+	})
+
+	t.Run("should return no match response when request does not match", func(t *testing.T) {
+		t.Parallel()
+
+		httpReq, _ := http.NewRequest(http.MethodGet, "/test/match?name=rick", http.NoBody)
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assertNotMatchedResponse(t, httpReq, httpResp)
+	})
 }
