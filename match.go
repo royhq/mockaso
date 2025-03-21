@@ -47,6 +47,7 @@ type StubMatcherRule func() requestMatcherFunc
 
 type RequestMatcherFunc func(*http.Request) bool
 
+// MatchRequest sets a rule to match the http request given a custom matcher.
 func MatchRequest(requestMatcher RequestMatcherFunc) StubMatcherRule {
 	matcher := requestMatcherFunc(func(_ *stub, r *http.Request) bool {
 		return requestMatcher(r)
