@@ -1,6 +1,9 @@
 package mockaso
 
 import (
+	"bytes"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -56,6 +59,16 @@ func MatchHeader(key, value string) StubMatcherRule {
 	return MatchRequest(matcher)
 }
 
+// MatchNoBody sets a rule to match the http request with empty body.
+func MatchNoBody() StubMatcherRule {
+	matcher := RequestMatcherFunc(func(r *http.Request) bool {
+		realReqBody := mustReadBody(r)
+		return len(realReqBody) == 0
+	})
+
+	return MatchRequest(matcher)
+}
+
 // MatchRequest sets a rule to match the http request given a custom matcher.
 func MatchRequest(requestMatcher RequestMatcherFunc) StubMatcherRule {
 	matcher := requestMatcherFunc(func(_ *stub, r *http.Request) bool {
@@ -63,4 +76,18 @@ func MatchRequest(requestMatcher RequestMatcherFunc) StubMatcherRule {
 	})
 
 	return func() requestMatcherFunc { return matcher }
+}
+
+func mustReadBody(r *http.Request) []byte {
+	buff := new(bytes.Buffer)
+	tee := io.TeeReader(r.Body, buff)
+
+	data, err := io.ReadAll(tee)
+	if err != nil {
+		panic(fmt.Errorf("read request body failed: %w", err))
+	}
+
+	r.Body = io.NopCloser(buff)
+
+	return data
 }
