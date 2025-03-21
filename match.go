@@ -47,6 +47,15 @@ type StubMatcherRule func() requestMatcherFunc
 
 type RequestMatcherFunc func(*http.Request) bool
 
+// MatchHeader sets a rule to match the http request with the given header value.
+func MatchHeader(key, value string) StubMatcherRule {
+	matcher := RequestMatcherFunc(func(r *http.Request) bool {
+		return r.Header.Get(key) == value
+	})
+
+	return MatchRequest(matcher)
+}
+
 // MatchRequest sets a rule to match the http request given a custom matcher.
 func MatchRequest(requestMatcher RequestMatcherFunc) StubMatcherRule {
 	matcher := requestMatcherFunc(func(_ *stub, r *http.Request) bool {

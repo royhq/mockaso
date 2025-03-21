@@ -102,7 +102,9 @@ func TestMatchRequest(t *testing.T) {
 		assert.Equal(t, int32(2), calls.Load())
 	})
 
-	server.Stub(http.MethodGet, mockaso.Path("/test/match")).
+	const path = "/test/match-request"
+
+	server.Stub(http.MethodGet, mockaso.Path(path)).
 		Match(
 			mockaso.MatchRequest(matchOnlyJohn),
 		).
@@ -114,7 +116,9 @@ func TestMatchRequest(t *testing.T) {
 	t.Run("should return the specified stub when request match", func(t *testing.T) {
 		t.Parallel()
 
-		httpReq, _ := http.NewRequest(http.MethodGet, "/test/match?name=john", http.NoBody)
+		httpReq, _ := http.NewRequest(http.MethodGet, path+"?name=john", http.NoBody)
+		require.Equal(t, path, httpReq.URL.Path)
+
 		httpResp, err := server.Client().Do(httpReq)
 		require.NoError(t, err)
 
@@ -125,7 +129,52 @@ func TestMatchRequest(t *testing.T) {
 	t.Run("should return no match response when request does not match", func(t *testing.T) {
 		t.Parallel()
 
-		httpReq, _ := http.NewRequest(http.MethodGet, "/test/match?name=rick", http.NoBody)
+		httpReq, _ := http.NewRequest(http.MethodGet, path+"?name=rick", http.NoBody)
+		require.Equal(t, path, httpReq.URL.Path)
+
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assertNotMatchedResponse(t, httpReq, httpResp)
+	})
+}
+
+func TestMatchHeader(t *testing.T) {
+	t.Parallel()
+
+	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
+	t.Cleanup(server.MustShutdown)
+
+	const path = "/test/match-header"
+
+	server.Stub(http.MethodGet, mockaso.Path(path)).
+		Match(
+			mockaso.MatchHeader("X-Test-Header", "test value"),
+		).
+		Respond(
+			mockaso.WithStatusCode(http.StatusOK),
+			mockaso.WithBody("matched request"),
+		)
+
+	t.Run("should return the specified stub when header match", func(t *testing.T) {
+		t.Parallel()
+
+		httpReq, _ := http.NewRequest(http.MethodGet, path, http.NoBody)
+		httpReq.Header.Set("X-Test-Header", "test value")
+
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, httpResp.StatusCode)
+		assertBodyString(t, "matched request", httpResp)
+	})
+
+	t.Run("should return no match response when header does not match", func(t *testing.T) {
+		t.Parallel()
+
+		httpReq, _ := http.NewRequest(http.MethodGet, path, http.NoBody)
+		httpReq.Header.Set("X-Test-Header", "another test value")
+
 		httpResp, err := server.Client().Do(httpReq)
 		require.NoError(t, err)
 
