@@ -27,8 +27,5 @@ jobs:
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
 
-      - name: Build
-        run: go build -v ./...
-
       - name: Test
         run: CI=CI GOWORK=off go test -v ./...
