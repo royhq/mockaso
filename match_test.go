@@ -235,14 +235,14 @@ func TestMatchJSONBody(t *testing.T) {
 	})
 }
 
-func TestMatchBodyAsMapFunc(t *testing.T) {
+func TestMatchBodyMapFunc(t *testing.T) {
 	t.Parallel()
 
 	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
 	t.Cleanup(server.MustShutdown)
 
 	var calls atomic.Int32
-	matchOnlyJohn := mockaso.BodyMatcherAsMapFunc(func(body map[string]any) bool {
+	matchOnlyJohn := mockaso.BodyMatcherMapFunc(func(body map[string]any) bool {
 		calls.Add(1)
 		return body["name"] == "john"
 	})
@@ -254,7 +254,7 @@ func TestMatchBodyAsMapFunc(t *testing.T) {
 	const path = "/test/body-as-map"
 
 	server.Stub(http.MethodPost, mockaso.Path(path)).
-		Match(mockaso.MatchBodyAsMapFunc(matchOnlyJohn)).
+		Match(mockaso.MatchBodyMapFunc(matchOnlyJohn)).
 		Respond(matchedRequestRules()...)
 
 	t.Run("should return the specified stub when matcher is true", func(t *testing.T) {
@@ -285,7 +285,7 @@ func TestMatchBodyAsMapFunc(t *testing.T) {
 
 		const path = path + "/empty-body"
 
-		matcher := mockaso.BodyMatcherAsMapFunc(func(body map[string]any) bool {
+		matcher := mockaso.BodyMatcherMapFunc(func(body map[string]any) bool {
 			assert.NotNil(t, body)
 			assert.Empty(t, body)
 
@@ -293,7 +293,7 @@ func TestMatchBodyAsMapFunc(t *testing.T) {
 		})
 
 		server.Stub(http.MethodPost, mockaso.Path(path)).
-			Match(mockaso.MatchBodyAsMapFunc(matcher)).
+			Match(mockaso.MatchBodyMapFunc(matcher)).
 			Respond(matchedRequestRules()...)
 
 		httpReq, _ := http.NewRequest(http.MethodPost, path, http.NoBody)
@@ -307,14 +307,14 @@ func TestMatchBodyAsMapFunc(t *testing.T) {
 	})
 }
 
-func TestMatchBodyAsStringFunc(t *testing.T) {
+func TestMatchBodyStringFunc(t *testing.T) {
 	t.Parallel()
 
 	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
 	t.Cleanup(server.MustShutdown)
 
 	var calls atomic.Int32
-	matchOnlyJohn := mockaso.BodyMatcherAsStringFunc(func(body string) bool {
+	matchOnlyJohn := mockaso.BodyMatcherStringFunc(func(body string) bool {
 		calls.Add(1)
 		return strings.Contains(body, `:"john"`)
 	})
@@ -326,7 +326,7 @@ func TestMatchBodyAsStringFunc(t *testing.T) {
 	const path = "/test/body-as-string"
 
 	server.Stub(http.MethodPost, mockaso.Path(path)).
-		Match(mockaso.MatchBodyAsStringFunc(matchOnlyJohn)).
+		Match(mockaso.MatchBodyStringFunc(matchOnlyJohn)).
 		Respond(matchedRequestRules()...)
 
 	t.Run("should return the specified stub when matcher is true", func(t *testing.T) {
@@ -357,13 +357,13 @@ func TestMatchBodyAsStringFunc(t *testing.T) {
 
 		const path = path + "/empty-body"
 
-		matcher := mockaso.BodyMatcherAsStringFunc(func(body string) bool {
+		matcher := mockaso.BodyMatcherStringFunc(func(body string) bool {
 			assert.Empty(t, body)
 			return true
 		})
 
 		server.Stub(http.MethodPost, mockaso.Path(path)).
-			Match(mockaso.MatchBodyAsStringFunc(matcher)).
+			Match(mockaso.MatchBodyStringFunc(matcher)).
 			Respond(matchedRequestRules()...)
 
 		httpReq, _ := http.NewRequest(http.MethodPost, path, http.NoBody)
