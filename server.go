@@ -2,6 +2,8 @@ package mockaso
 
 import (
 	"fmt"
+	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -84,6 +86,10 @@ func (s *Server) Client() *http.Client {
 	return client
 }
 
+func (s *Server) Logger() Logger {
+	return s.logger
+}
+
 func (s *Server) Stub(method string, url URLMatcher) Stub {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -147,5 +153,20 @@ type ServerOption func(*Server)
 func WithLogger(logger Logger) ServerOption {
 	return func(s *Server) {
 		s.logger = logger
+	}
+}
+
+// WithSlogLogger sets a Logger from slog.Logger.
+// level is the slog.LogLevel that will be used.
+func WithSlogLogger(logger *slog.Logger, level slog.Level) ServerOption {
+	return func(s *Server) {
+		s.logger = NewSlogLogger(logger, level)
+	}
+}
+
+// WithLogLogger sets a Logger from log.Logger.
+func WithLogLogger(logger *log.Logger) ServerOption {
+	return func(s *Server) {
+		s.logger = NewLogLogger(logger)
 	}
 }
