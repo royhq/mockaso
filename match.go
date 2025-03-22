@@ -71,6 +71,11 @@ func MatchNoBody() StubMatcherRule {
 	return MatchRequest(matcher)
 }
 
+// MatchRawJSONBody sets a rule to match the http request with the given raw JSON body.
+func MatchRawJSONBody[T string | []byte | json.RawMessage](raw T) StubMatcherRule {
+	return MatchJSONBody(json.RawMessage(raw))
+}
+
 // MatchJSONBody sets a rule to match the http request with the given JSON body.
 // The specified body will be marshaled and compared with the real body.
 func MatchJSONBody(body any) StubMatcherRule {

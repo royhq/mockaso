@@ -208,6 +208,42 @@ func TestMatchNoBody(t *testing.T) {
 	})
 }
 
+func TestMatchRawJSONBody(t *testing.T) {
+	t.Parallel()
+
+	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
+	t.Cleanup(server.MustShutdown)
+
+	const path = "/test/match-raw-json"
+
+	server.Stub(http.MethodPost, mockaso.Path(path)).
+		Match(mockaso.MatchRawJSONBody(`{"name":"john"}`)).
+		Respond(matchedRequestRules()...)
+
+	t.Run("should return the specified stub when request match", func(t *testing.T) {
+		t.Parallel()
+
+		body := strings.NewReader(`{"name":"john"}`)
+		httpReq, _ := http.NewRequest(http.MethodPost, path, body)
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, httpResp.StatusCode)
+		assertBodyString(t, "matched request", httpResp)
+	})
+
+	t.Run("should return no match response when request does not match", func(t *testing.T) {
+		t.Parallel()
+
+		body := strings.NewReader(`{"name":"rick"}`)
+		httpReq, _ := http.NewRequest(http.MethodPost, path, body)
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assertNotMatchedResponse(t, httpReq, httpResp)
+	})
+}
+
 func TestMatchJSONBody(t *testing.T) {
 	t.Parallel()
 
