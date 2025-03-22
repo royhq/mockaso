@@ -235,6 +235,78 @@ func TestMatchJSONBody(t *testing.T) {
 	})
 }
 
+func TestMatchBodyAsMapFunc(t *testing.T) {
+	t.Parallel()
+
+	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
+	t.Cleanup(server.MustShutdown)
+
+	var calls atomic.Int32
+	matchOnlyJohn := mockaso.BodyMatcherAsMapFunc(func(body map[string]any) bool {
+		calls.Add(1)
+		return body["name"] == "john"
+	})
+
+	t.Cleanup(func() {
+		assert.Equal(t, int32(2), calls.Load())
+	})
+
+	const path = "/test/body-as-map"
+
+	server.Stub(http.MethodPost, mockaso.Path(path)).
+		Match(mockaso.MatchBodyAsMapFunc(matchOnlyJohn)).
+		Respond(matchedRequestRules()...)
+
+	t.Run("should return the specified stub when matcher is true", func(t *testing.T) {
+		t.Parallel()
+
+		body := strings.NewReader(`{"name":"john"}`)
+		httpReq, _ := http.NewRequest(http.MethodPost, path, body)
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, httpResp.StatusCode)
+		assertBodyString(t, "matched request", httpResp)
+	})
+
+	t.Run("should return no match response when matcher is false", func(t *testing.T) {
+		t.Parallel()
+
+		body := strings.NewReader(`{"name":"rick"}`)
+		httpReq, _ := http.NewRequest(http.MethodPost, path, body)
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assertNotMatchedResponse(t, httpReq, httpResp)
+	})
+
+	t.Run("should receive an empty map in matcher when request has no body", func(t *testing.T) {
+		t.Parallel()
+
+		const path = path + "/empty-body"
+
+		matcher := mockaso.BodyMatcherAsMapFunc(func(body map[string]any) bool {
+			assert.NotNil(t, body)
+			assert.Empty(t, body)
+
+			return true
+		})
+
+		server.Stub(http.MethodPost, mockaso.Path(path)).
+			Match(mockaso.MatchBodyAsMapFunc(matcher)).
+			Respond(matchedRequestRules()...)
+
+		httpReq, _ := http.NewRequest(http.MethodPost, path, http.NoBody)
+		require.Equal(t, path, httpReq.URL.Path)
+
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, httpResp.StatusCode)
+		assertBodyString(t, "matched request", httpResp)
+	})
+}
+
 func matchedRequestRules() []mockaso.StubResponseRule {
 	return []mockaso.StubResponseRule{
 		mockaso.WithStatusCode(http.StatusOK),

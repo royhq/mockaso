@@ -93,6 +93,30 @@ func MatchJSONBody(body any) StubMatcherRule {
 	return MatchRequest(matcher)
 }
 
+type BodyMatcherAsMapFunc func(map[string]any) bool
+
+// MatchBodyAsMapFunc sets a rule to match the http request with the given matcher based on the body as a map.
+// The matcher is a func that receives the body parameters as a map. If the body is empty the map will be empty.
+func MatchBodyAsMapFunc(bodyMatcher BodyMatcherAsMapFunc) StubMatcherRule {
+	matcher := RequestMatcherFunc(func(r *http.Request) bool {
+		reqBody := mustReadBody(r)
+
+		if len(reqBody) == 0 { // empty body
+			return bodyMatcher(make(map[string]any)) // empty map
+		}
+
+		var bodyMap map[string]any
+
+		if err := json.Unmarshal(reqBody, &bodyMap); err != nil {
+			panic(fmt.Errorf("MatchBodyAsMapFunc err: unmarshal body failed: %w", err))
+		}
+
+		return bodyMatcher(bodyMap)
+	})
+
+	return MatchRequest(matcher)
+}
+
 // MatchRequest sets a rule to match the http request given a custom matcher.
 func MatchRequest(requestMatcher RequestMatcherFunc) StubMatcherRule {
 	matcher := requestMatcherFunc(func(_ *stub, r *http.Request) bool {
