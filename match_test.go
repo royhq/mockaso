@@ -87,6 +87,49 @@ func TestPath(t *testing.T) {
 	}
 }
 
+func TestURLRegex(t *testing.T) {
+	t.Parallel()
+
+	reqURL := "/api/users?page=1&size=20"
+	httpReq := httptest.NewRequest(http.MethodGet, reqURL, http.NoBody)
+
+	regexValues := []string{
+		`\/api\/users\?page=1\&size=20`,
+		`^\/api\/users\?page=1\&size=20$`,
+		`^\/api\/users\?page=\d+\&size=\d+$`,
+		`^\/api\/[a-zA-Z]+\?page=\d+\&size=\d+$`,
+	}
+
+	for _, r := range regexValues {
+		t.Run(r, func(t *testing.T) {
+			t.Parallel()
+			matcher := mockaso.URLRegex(r)
+			assert.True(t, matcher(httpReq.URL))
+		})
+	}
+}
+
+func TestPathRegex(t *testing.T) {
+	t.Parallel()
+
+	reqURL := "/api/users?page=1&size=20"
+	httpReq := httptest.NewRequest(http.MethodGet, reqURL, http.NoBody)
+
+	regexValues := []string{
+		`\/api\/users`,
+		`^\/api\/users$`,
+		`^\/api\/[a-zA-Z]+`,
+	}
+
+	for _, r := range regexValues {
+		t.Run(r, func(t *testing.T) {
+			t.Parallel()
+			matcher := mockaso.PathRegex(r)
+			assert.True(t, matcher(httpReq.URL))
+		})
+	}
+}
+
 func TestMatchRequest(t *testing.T) {
 	t.Parallel()
 
