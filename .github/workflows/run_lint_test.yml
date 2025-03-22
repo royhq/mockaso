@@ -4,26 +4,28 @@ on:
   push:
     branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
+    types: [opened, reopened, synchronize, ready_for_review]
+
+env:
+  GO_VERSION: "1.24"
+  GOLANGCI_LINT_VERSION: v1.64.8
 
 jobs:
-  build:
+  run-lint-test:
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: ${{ env.GO_VERSION }}
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.64.7
-
-      - name: Build
-        run: go build -v ./...
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
 
       - name: Test
-        run: go test -v ./...
+        run: CI=CI GOWORK=off go test -v ./...
