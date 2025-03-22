@@ -47,7 +47,7 @@ func (l *LogLogger) Log(args ...any) {
 }
 
 func (l *LogLogger) Logf(format string, args ...any) {
-	l.logger.Println(fmt.Sprintf(format, args...))
+	l.logger.Printf(format, args...)
 }
 
 func NewLogLogger(logger *log.Logger) *LogLogger {
