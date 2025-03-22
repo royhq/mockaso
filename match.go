@@ -2,10 +2,12 @@ package mockaso
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 )
 
@@ -69,6 +71,28 @@ func MatchNoBody() StubMatcherRule {
 	return MatchRequest(matcher)
 }
 
+// MatchJSONBody sets a rule to match the http request with the given JSON body.
+// The specified body will be marshaled and compared with the real body.
+func MatchJSONBody(body any) StubMatcherRule {
+	data, err := json.Marshal(body)
+	if err != nil {
+		panic(fmt.Errorf("MatchJSONBody err: marshal body failed: %w", err))
+	}
+
+	matcher := RequestMatcherFunc(func(r *http.Request) bool {
+		reqBody := mustReadBody(r)
+
+		equals, equalsErr := equalJSON(reqBody, data)
+		if equalsErr != nil {
+			panic(fmt.Errorf("MatchJSONBody err: equals failed: %w", equalsErr))
+		}
+
+		return equals
+	})
+
+	return MatchRequest(matcher)
+}
+
 // MatchRequest sets a rule to match the http request given a custom matcher.
 func MatchRequest(requestMatcher RequestMatcherFunc) StubMatcherRule {
 	matcher := requestMatcherFunc(func(_ *stub, r *http.Request) bool {
@@ -90,4 +114,22 @@ func mustReadBody(r *http.Request) []byte {
 	r.Body = io.NopCloser(buff)
 
 	return data
+}
+
+func equalJSON(v1, v2 []byte) (bool, error) {
+	var json1, json2 any
+
+	if len(v1) > 0 {
+		if err := json.Unmarshal(v1, &json1); err != nil {
+			return false, fmt.Errorf("failed to unmarshal JSON v1: %w", err)
+		}
+	}
+
+	if len(v2) > 0 {
+		if err := json.Unmarshal(v2, &json2); err != nil {
+			return false, fmt.Errorf("failed to unmarshal JSON v2: %w", err)
+		}
+	}
+
+	return reflect.DeepEqual(json1, json2), nil
 }
