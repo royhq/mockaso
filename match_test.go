@@ -173,6 +173,40 @@ func TestMatchHeader(t *testing.T) {
 	})
 }
 
+func TestMatchQuery(t *testing.T) {
+	t.Parallel()
+
+	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
+	t.Cleanup(server.MustShutdown)
+
+	const path = "/test/match-query"
+
+	server.Stub(http.MethodGet, mockaso.Path(path)).
+		Match(mockaso.MatchQuery("name", "john")).
+		Respond(matchedRequestRules()...)
+
+	t.Run("should return the specified stub when query match", func(t *testing.T) {
+		t.Parallel()
+
+		httpReq, _ := http.NewRequest(http.MethodGet, path+"?name=john", http.NoBody)
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, httpResp.StatusCode)
+		assertBodyString(t, "matched request", httpResp)
+	})
+
+	t.Run("should return no match response when query does not match", func(t *testing.T) {
+		t.Parallel()
+
+		httpReq, _ := http.NewRequest(http.MethodGet, path+"?name=rick", http.NoBody)
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assertNotMatchedResponse(t, httpReq, httpResp)
+	})
+}
+
 func TestMatchNoBody(t *testing.T) {
 	t.Parallel()
 

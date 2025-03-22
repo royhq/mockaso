@@ -61,6 +61,15 @@ func MatchHeader(key, value string) StubMatcherRule {
 	return MatchRequest(matcher)
 }
 
+// MatchQuery sets a rule to match the http request with the given query string value.
+func MatchQuery(key, value string) StubMatcherRule {
+	matcher := RequestMatcherFunc(func(r *http.Request) bool {
+		return r.URL.Query().Get(key) == value
+	})
+
+	return MatchRequest(matcher)
+}
+
 // MatchNoBody sets a rule to match the http request with empty body.
 func MatchNoBody() StubMatcherRule {
 	matcher := RequestMatcherFunc(func(r *http.Request) bool {
