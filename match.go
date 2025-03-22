@@ -117,6 +117,19 @@ func MatchBodyAsMapFunc(bodyMatcher BodyMatcherAsMapFunc) StubMatcherRule {
 	return MatchRequest(matcher)
 }
 
+type BodyMatcherAsStringFunc func(string) bool
+
+// MatchBodyAsStringFunc sets a rule to match the http request with the given matcher based on the body as string.
+// The matcher is a func that receives the body as plain text.
+func MatchBodyAsStringFunc(bodyMatcher BodyMatcherAsStringFunc) StubMatcherRule {
+	matcher := RequestMatcherFunc(func(r *http.Request) bool {
+		reqBody := mustReadBody(r)
+		return bodyMatcher(string(reqBody))
+	})
+
+	return MatchRequest(matcher)
+}
+
 // MatchRequest sets a rule to match the http request given a custom matcher.
 func MatchRequest(requestMatcher RequestMatcherFunc) StubMatcherRule {
 	matcher := requestMatcherFunc(func(_ *stub, r *http.Request) bool {
