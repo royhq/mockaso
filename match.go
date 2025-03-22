@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"regexp"
 	"strings"
 )
 
@@ -27,6 +28,18 @@ func Path(path string) URLMatcher {
 	return func(url *url.URL) bool {
 		return url.Path == strings.TrimSuffix(path, "/")
 	}
+}
+
+// URLRegex will match http request when the regex pattern specified match to the request URL.
+func URLRegex(pattern string) URLMatcher {
+	regex := regexp.MustCompile(pattern)
+	return func(url *url.URL) bool { return regex.MatchString(url.String()) }
+}
+
+// PathRegex will match http request when the regex pattern specified match to the request URL path part.
+func PathRegex(pattern string) URLMatcher {
+	regex := regexp.MustCompile(pattern)
+	return func(url *url.URL) bool { return regex.MatchString(url.Path) }
 }
 
 func defaultMatchers(method string, url URLMatcher) []requestMatcherFunc {
@@ -56,6 +69,15 @@ type RequestMatcherFunc func(*http.Request) bool
 func MatchHeader(key, value string) StubMatcherRule {
 	matcher := RequestMatcherFunc(func(r *http.Request) bool {
 		return r.Header.Get(key) == value
+	})
+
+	return MatchRequest(matcher)
+}
+
+// MatchQuery sets a rule to match the http request with the given query string value.
+func MatchQuery(key, value string) StubMatcherRule {
+	matcher := RequestMatcherFunc(func(r *http.Request) bool {
+		return r.URL.Query().Get(key) == value
 	})
 
 	return MatchRequest(matcher)
