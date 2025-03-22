@@ -1,8 +1,11 @@
 package mockaso_test
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"log"
+	"log/slog"
 	"net/http"
 	"testing"
 
@@ -84,7 +87,7 @@ func TestServer(t *testing.T) {
 func TestServer_Stub(t *testing.T) {
 	t.Parallel()
 
-	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
+	server := mockaso.MustStartNewServer()
 	t.Cleanup(server.MustShutdown)
 
 	client := server.Client()
@@ -117,6 +120,34 @@ func TestServer_Stub(t *testing.T) {
 		require.NoError(t, err)
 
 		assertNotMatchedResponse(t, httpReq, httpResp)
+	})
+}
+
+func TestWithSlogLogger(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should log with the specified slog logger", func(t *testing.T) {
+		var buff bytes.Buffer
+		logger := slog.New(slog.NewTextHandler(&buff, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+		server := mockaso.NewServer(mockaso.WithSlogLogger(logger, slog.LevelInfo))
+
+		server.Logger().Log("test message")
+		assert.Regexp(t, `time=[^ ]+ level=INFO msg="test message"`, buff.String())
+	})
+}
+
+func TestWithLogLogger(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should log with the specified log logger", func(t *testing.T) {
+		var buff bytes.Buffer
+		logger := log.New(&buff, "", 0)
+
+		server := mockaso.NewServer(mockaso.WithLogLogger(logger))
+
+		server.Logger().Log("test message")
+		assert.Equal(t, "test message\n", buff.String())
 	})
 }
 
