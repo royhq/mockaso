@@ -3,6 +3,7 @@ package mockaso
 import (
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
 )
 
@@ -18,6 +19,7 @@ type noLogger struct{}
 func (n noLogger) Log(...any)          {}
 func (n noLogger) Logf(string, ...any) {}
 
+// SlogLogger implementation of Logger using an slog.Logger.
 type SlogLogger struct {
 	logger *slog.Logger
 	level  slog.Level
@@ -33,4 +35,21 @@ func (l *SlogLogger) Logf(format string, args ...any) {
 
 func NewSlogLogger(logger *slog.Logger, level slog.Level) *SlogLogger {
 	return &SlogLogger{logger: logger, level: level}
+}
+
+// LogLogger implementation of Logger using a log.Logger.
+type LogLogger struct {
+	logger *log.Logger
+}
+
+func (l *LogLogger) Log(args ...any) {
+	l.logger.Println(fmt.Sprint(args...))
+}
+
+func (l *LogLogger) Logf(format string, args ...any) {
+	l.logger.Println(fmt.Sprintf(format, args...))
+}
+
+func NewLogLogger(logger *log.Logger) *LogLogger {
+	return &LogLogger{logger: logger}
 }
