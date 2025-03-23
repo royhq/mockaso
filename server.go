@@ -94,7 +94,12 @@ func (s *Server) Stub(method string, url URLMatcher) Stub {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	st := &stub{response: newStubResponse(), matchers: defaultMatchers(method, url)}
+	st := &stub{
+		response:      newStubResponse(),
+		matchers:      defaultMatchers(method, url),
+		patternParams: make(map[string]string),
+	}
+
 	s.stubs = append(s.stubs, st)
 
 	return st

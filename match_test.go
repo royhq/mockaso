@@ -45,7 +45,7 @@ func TestURL(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			matcher := mockaso.URL(tc.matchURL)
-			assert.Equal(t, tc.expectedMatch, matcher(httpReq.URL))
+			assert.Equal(t, tc.expectedMatch, matcher(httpReq.URL, nil))
 		})
 	}
 }
@@ -82,7 +82,7 @@ func TestPath(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			matcher := mockaso.Path(tc.matchURL)
-			assert.Equal(t, tc.expectedMatch, matcher(httpReq.URL))
+			assert.Equal(t, tc.expectedMatch, matcher(httpReq.URL, nil))
 		})
 	}
 }
@@ -104,7 +104,7 @@ func TestURLRegex(t *testing.T) {
 		t.Run(r, func(t *testing.T) {
 			t.Parallel()
 			matcher := mockaso.URLRegex(r)
-			assert.True(t, matcher(httpReq.URL))
+			assert.True(t, matcher(httpReq.URL, nil))
 		})
 	}
 }
@@ -125,7 +125,7 @@ func TestPathRegex(t *testing.T) {
 		t.Run(r, func(t *testing.T) {
 			t.Parallel()
 			matcher := mockaso.PathRegex(r)
-			assert.True(t, matcher(httpReq.URL))
+			assert.True(t, matcher(httpReq.URL, nil))
 		})
 	}
 }
@@ -243,6 +243,41 @@ func TestMatchQuery(t *testing.T) {
 		t.Parallel()
 
 		httpReq, _ := http.NewRequest(http.MethodGet, path+"?name=rick", http.NoBody)
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assertNotMatchedResponse(t, httpReq, httpResp)
+	})
+}
+
+func TestMatchParam(t *testing.T) {
+	t.Parallel()
+
+	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
+	t.Cleanup(server.MustShutdown)
+
+	urlPattern := mockaso.URLPattern("/api/users/{username}")
+	const path = "/api/users"
+
+	server.Stub(http.MethodGet, urlPattern).
+		Match(mockaso.MatchParam("username", "john")).
+		Respond(matchedRequestRules()...)
+
+	t.Run("should return the specified stub when param match", func(t *testing.T) {
+		t.Parallel()
+
+		httpReq, _ := http.NewRequest(http.MethodGet, path+"/john", http.NoBody)
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, httpResp.StatusCode)
+		assertBodyString(t, "matched request", httpResp)
+	})
+
+	t.Run("should return no match response when query does not match", func(t *testing.T) {
+		t.Parallel()
+
+		httpReq, _ := http.NewRequest(http.MethodGet, path+"/rick", http.NoBody)
 		httpResp, err := server.Client().Do(httpReq)
 		require.NoError(t, err)
 
