@@ -273,6 +273,27 @@ func TestMatchParam(t *testing.T) {
 		assertBodyString(t, "matched request", httpResp)
 	})
 
+	t.Run("should return the specified stub when param match in query string", func(t *testing.T) {
+		t.Parallel()
+
+		server.Stub(http.MethodGet, mockaso.URLPattern("/api/users/{username}?attrs={attrs}")).
+			Match(
+				mockaso.MatchParam("username", "john"),
+				mockaso.MatchParam("attrs", "name,age"),
+			).
+			Respond(
+				mockaso.WithStatusCode(http.StatusBadRequest),
+				mockaso.WithBody("invalid attrs"),
+			)
+
+		httpReq, _ := http.NewRequest(http.MethodGet, path+"/john?attrs=name,age", http.NoBody)
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assert.Equal(t, http.StatusBadRequest, httpResp.StatusCode)
+		assertBodyString(t, "invalid attrs", httpResp)
+	})
+
 	t.Run("should return no match response when query does not match", func(t *testing.T) {
 		t.Parallel()
 
