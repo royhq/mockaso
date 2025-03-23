@@ -14,8 +14,9 @@ type StubResponder interface {
 }
 
 type stub struct {
-	matchers []requestMatcherFunc
-	response *stubResponse
+	matchers      []requestMatcherFunc
+	response      *stubResponse
+	patternParams map[string]string
 }
 
 func (s *stub) Match(rules ...StubMatcherRule) StubResponder {
