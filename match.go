@@ -93,7 +93,7 @@ func convertPatternToRegex(urlPattern string) (string, []string) {
 
 	var paramNames []string
 
-	re := regexp.MustCompile(`\{(\w+)\}`) // to identify parameters like {param_name} within pattern
+	re := regexp.MustCompile(`\{(\w+)}`) // to identify parameters like {param_name} within pattern
 
 	urlPattern = re.ReplaceAllStringFunc(urlPattern, func(match string) string {
 		paramName := re.FindStringSubmatch(match)[1]
