@@ -256,10 +256,9 @@ func TestMatchParam(t *testing.T) {
 	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
 	t.Cleanup(server.MustShutdown)
 
-	urlPattern := mockaso.URLPattern("/api/users/{username}")
 	const path = "/api/users"
 
-	server.Stub(http.MethodGet, urlPattern).
+	server.Stub(http.MethodGet, mockaso.URLPattern("/api/users/{username}")).
 		Match(mockaso.MatchParam("username", "john")).
 		Respond(matchedRequestRules()...)
 

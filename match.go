@@ -107,8 +107,8 @@ func convertPatternToRegex(urlPattern string) (string, []string) {
 
 func escapeURLPattern(urlPattern string) string {
 	escaped := strings.ReplaceAll(urlPattern, "?", `\?`)
-	escaped = strings.ReplaceAll(urlPattern, "&", `\&`)
-	escaped = strings.ReplaceAll(urlPattern, "=", `\=`)
+	escaped = strings.ReplaceAll(escaped, "&", `\&`)
+	escaped = strings.ReplaceAll(escaped, "=", `\=`)
 
 	return escaped
 }
