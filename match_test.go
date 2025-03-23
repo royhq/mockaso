@@ -53,38 +53,41 @@ func TestURL(t *testing.T) {
 func TestPath(t *testing.T) {
 	t.Parallel()
 
-	reqURL := "/api/users?page=1&size=20"
-	httpReq := httptest.NewRequest(http.MethodGet, reqURL, http.NoBody)
+	t.Run("should match", func(t *testing.T) {
+		reqURL := "/api/users?page=1&size=20"
+		httpReq := httptest.NewRequest(http.MethodGet, reqURL, http.NoBody)
 
-	testCases := map[string]struct {
-		matchURL      string
-		expectedMatch bool
-	}{
-		"should return true when path matched": {
-			matchURL:      "/api/users",
-			expectedMatch: true,
-		},
-		"should return true when path matched with trailing slash": {
-			matchURL:      "/api/users/",
-			expectedMatch: true,
-		},
-		"should return false when path does not match": {
-			matchURL:      "/api/users/john-doe",
-			expectedMatch: false,
-		},
-		"should return false when path does not match by including query params": {
-			matchURL:      "/api/users?page=1&size=20",
-			expectedMatch: false,
-		},
-	}
+		testCases := map[string]struct {
+			matchURL      string
+			expectedMatch bool
+		}{
+			"should return true when path matched": {
+				matchURL:      "/api/users",
+				expectedMatch: true,
+			},
+			"should return true when path matched with trailing slash": {
+				matchURL:      "/api/users/",
+				expectedMatch: true,
+			},
+			"should return false when path does not match": {
+				matchURL:      "/api/users/john-doe",
+				expectedMatch: false,
+			},
+		}
 
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			matcher := mockaso.Path(tc.matchURL)
-			assert.Equal(t, tc.expectedMatch, matcher(httpReq.URL, nil))
-		})
-	}
+		for name, tc := range testCases {
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+				matcher := mockaso.Path(tc.matchURL)
+				assert.Equal(t, tc.expectedMatch, matcher(httpReq.URL, nil))
+			})
+		}
+	})
+
+	t.Run("should panic when path has query string parameters", func(t *testing.T) {
+		fn := func() { mockaso.Path("/api/users/john?attrs=name,age") }
+		assert.PanicsWithError(t, "pattern must not contain any query string parameters", fn)
+	})
 }
 
 func TestURLRegex(t *testing.T) {
@@ -128,6 +131,15 @@ func TestPathRegex(t *testing.T) {
 			assert.True(t, matcher(httpReq.URL, nil))
 		})
 	}
+}
+
+func TestPathPattern(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should panic when path has query string parameters", func(t *testing.T) {
+		fn := func() { mockaso.PathPattern("/api/users/{username}?attrs=name,age") }
+		assert.PanicsWithError(t, "pattern must not contain any query string parameters", fn)
+	})
 }
 
 func TestMatchRequest(t *testing.T) {
@@ -250,7 +262,7 @@ func TestMatchQuery(t *testing.T) {
 	})
 }
 
-func TestMatchParam(t *testing.T) {
+func TestMatchParam_URLPattern(t *testing.T) {
 	t.Parallel()
 
 	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
@@ -294,7 +306,41 @@ func TestMatchParam(t *testing.T) {
 		assertBodyString(t, "invalid attrs", httpResp)
 	})
 
-	t.Run("should return no match response when query does not match", func(t *testing.T) {
+	t.Run("should return no match response when param does not match", func(t *testing.T) {
+		t.Parallel()
+
+		httpReq, _ := http.NewRequest(http.MethodGet, path+"/rick", http.NoBody)
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assertNotMatchedResponse(t, httpReq, httpResp)
+	})
+}
+
+func TestMatchParam_PathPattern(t *testing.T) {
+	t.Parallel()
+
+	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
+	t.Cleanup(server.MustShutdown)
+
+	const path = "/api/users"
+
+	server.Stub(http.MethodGet, mockaso.PathPattern("/api/users/{username}")).
+		Match(mockaso.MatchParam("username", "john")).
+		Respond(matchedRequestRules()...)
+
+	t.Run("should return the specified stub when param match", func(t *testing.T) {
+		t.Parallel()
+
+		httpReq, _ := http.NewRequest(http.MethodGet, path+"/john", http.NoBody)
+		httpResp, err := server.Client().Do(httpReq)
+		require.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, httpResp.StatusCode)
+		assertBodyString(t, "matched request", httpResp)
+	})
+
+	t.Run("should return no match response when param does not match", func(t *testing.T) {
 		t.Parallel()
 
 		httpReq, _ := http.NewRequest(http.MethodGet, path+"/rick", http.NoBody)

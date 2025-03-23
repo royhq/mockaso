@@ -3,6 +3,7 @@ package mockaso
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,6 +26,8 @@ func URL(u string) URLMatcher {
 
 // Path will match http request when the value specified is equals to the request URL path part.
 func Path(path string) URLMatcher {
+	ensureHasNotQueryStringParams(path)
+
 	return func(url *url.URL, _ *stub) bool {
 		return url.Path == strings.TrimSuffix(path, "/")
 	}
@@ -44,29 +47,29 @@ func PathRegex(pattern string) URLMatcher {
 
 // URLPattern will match http request when the given URL pattern match to the request URL.
 // Can specify path params with {param_name} notation and then use it in matcher.
+// Can use parameters in query string.
 //
 // Example:
 //
 //	URLPattern("/api/users/{user_id}")
+//	URLPattern("/api/users/{user_id}?attrs={attrs}")
 func URLPattern(pattern string) URLMatcher {
-	expr, paramKeys := convertPatternToRegex(pattern)
-	regex := regexp.MustCompile(expr)
+	source := func(u *url.URL) string { return u.String() } // use complete url as source
+	return patternMatcher(source, pattern)
+}
 
-	return func(url *url.URL, s *stub) bool {
-		match := regex.FindStringSubmatch(url.String())
-		if match == nil {
-			return false
-		}
+// PathPattern will match http request when the given URL pattern match to the request URL path part.
+// Can specify path params with {param_name} notation and then use it in matcher.
+// Can't use parameters in query string, only path will be evaluated.
+//
+// Example:
+//
+//	PathPattern("/api/users/{user_id}")
+func PathPattern(pattern string) URLMatcher {
+	ensureHasNotQueryStringParams(pattern)
+	source := func(u *url.URL) string { return u.Path } // use url path as source
 
-		params := make(map[string]string)
-		for i, paramKey := range paramKeys {
-			params[paramKey] = match[i+1]
-		}
-
-		s.patternParams = params
-
-		return true
-	}
+	return patternMatcher(source, pattern)
 }
 
 func defaultMatchers(method string, url URLMatcher) []requestMatcherFunc {
@@ -85,6 +88,27 @@ func methodMatcher(method string) requestMatcherFunc {
 func urlMatcher(matcher URLMatcher) requestMatcherFunc {
 	return func(st *stub, r *http.Request) bool {
 		return matcher(r.URL, st)
+	}
+}
+
+func patternMatcher(source func(*url.URL) string, pattern string) URLMatcher {
+	expr, paramKeys := convertPatternToRegex(pattern)
+	regex := regexp.MustCompile(expr)
+
+	return func(url *url.URL, s *stub) bool {
+		match := regex.FindStringSubmatch(source(url))
+		if match == nil {
+			return false
+		}
+
+		params := make(map[string]string)
+		for i, paramKey := range paramKeys {
+			params[paramKey] = match[i+1]
+		}
+
+		s.patternParams = params
+
+		return true
 	}
 }
 
@@ -111,6 +135,17 @@ func escapeURLPattern(urlPattern string) string {
 	escaped = strings.ReplaceAll(escaped, "=", `\=`)
 
 	return escaped
+}
+
+func ensureHasNotQueryStringParams(pattern string) {
+	parsed, err := url.Parse(pattern)
+	if err != nil {
+		panic(fmt.Errorf("not valid url"))
+	}
+
+	if len(parsed.Query()) > 0 {
+		panic(errors.New("pattern must not contain any query string parameters"))
+	}
 }
 
 type StubMatcherRule func() requestMatcherFunc
