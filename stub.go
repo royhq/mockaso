@@ -2,6 +2,7 @@ package mockaso
 
 import (
 	"net/http"
+	"time"
 )
 
 type Stub interface {
@@ -44,6 +45,10 @@ func (s *stub) match(r *http.Request) bool {
 }
 
 func (s *stub) write(w http.ResponseWriter) {
+	if s.response.delay > 0 {
+		time.Sleep(s.response.delay)
+	}
+
 	for k, v := range s.response.headers {
 		w.Header().Set(k, v)
 	}
@@ -56,6 +61,7 @@ type stubResponse struct {
 	statusCode int
 	body       []byte
 	headers    map[string]string
+	delay      time.Duration
 }
 
 func (r *stubResponse) setHeader(key, value string) {
