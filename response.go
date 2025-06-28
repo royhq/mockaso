@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 )
 
 type StubResponseRule func(*stubResponse)
@@ -68,6 +69,13 @@ func WithHeader(key, value string) StubResponseRule {
 func WithHeaders(headers map[string]string) StubResponseRule {
 	return func(r *stubResponse) {
 		r.setHeaders(headers)
+	}
+}
+
+// WithDelay sets a delay time to the response.
+func WithDelay(d time.Duration) StubResponseRule {
+	return func(r *stubResponse) {
+		r.delay = d
 	}
 }
 

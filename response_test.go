@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -329,6 +330,35 @@ func TestWithHeader_And_WithHeaders(t *testing.T) {
 			assert.Equal(t, "test value 3", httpResp.Header.Get("X-Test-Header3"))
 			assert.Equal(t, "test value 4", httpResp.Header.Get("X-Test-Header4"))
 		})
+	})
+}
+
+func TestWithDelay(t *testing.T) {
+	t.Parallel()
+
+	server := mockaso.MustStartNewServer(mockaso.WithLogger(t))
+	t.Cleanup(server.MustShutdown)
+
+	t.Run("should return with the specified delay", func(t *testing.T) {
+		url := "/test/with-delay"
+		delay := 1200 * time.Millisecond
+		start := time.Now()
+
+		server.Stub(http.MethodGet, mockaso.URL(url)).
+			Respond(
+				mockaso.WithStatusCode(http.StatusOK),
+				mockaso.WithDelay(delay),
+			)
+
+		httpReq, _ := http.NewRequest(http.MethodGet, url, http.NoBody)
+		httpResp, err := server.Client().Do(httpReq)
+		elapsed := time.Since(start)
+
+		require.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, httpResp.StatusCode)
+		t.Logf("duration: %v", elapsed)
+		assert.GreaterOrEqual(t, elapsed, delay)
 	})
 }
 
