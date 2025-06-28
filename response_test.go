@@ -358,7 +358,7 @@ func TestWithDelay(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, httpResp.StatusCode)
 		t.Logf("duration: %v", elapsed)
-		assert.GreaterOrEqual(t, elapsed, 1200*time.Millisecond)
+		assert.GreaterOrEqual(t, elapsed, delay)
 	})
 }
 
