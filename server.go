@@ -112,7 +112,7 @@ func (s *Server) newTestServer() *httptest.Server {
 
 		for _, st := range s.stubs {
 			if st.match(r) {
-				st.write(w)
+				st.write(w, r)
 				return
 			}
 		}

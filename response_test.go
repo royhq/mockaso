@@ -2,6 +2,7 @@ package mockaso_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -359,6 +360,49 @@ func TestWithDelay(t *testing.T) {
 		assert.Equal(t, http.StatusOK, httpResp.StatusCode)
 		t.Logf("duration: %v", elapsed)
 		assert.GreaterOrEqual(t, elapsed, delay)
+	})
+
+	t.Run("should panic when delay is negative", func(t *testing.T) {
+		t.Parallel()
+
+		fn := func() {
+			server.Stub(http.MethodGet, mockaso.URL("/test/negative-delay")).
+				Respond(mockaso.WithDelay(-5 * time.Second))
+		}
+
+		assert.PanicsWithError(t, "WithDelay: delay must be non-negative, got -5s", fn)
+	})
+
+	t.Run("should respect context cancellation", func(t *testing.T) {
+		t.Parallel()
+
+		url := "/test/with-delay-cancel"
+		delay := 5 * time.Second
+		start := time.Now()
+
+		server.Stub(http.MethodGet, mockaso.URL(url)).
+			Respond(
+				mockaso.WithStatusCode(http.StatusOK),
+				mockaso.WithBody("delayed response"),
+				mockaso.WithDelay(delay),
+			)
+
+		// Create request with timeout shorter than delay
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		httpReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+		httpResp, err := server.Client().Do(httpReq)
+		elapsed := time.Since(start)
+
+		// Should error due to context cancellation
+		require.Error(t, err)
+		assert.Nil(t, httpResp)
+
+		// Should complete quickly (not wait full delay)
+		t.Logf("duration: %v", elapsed)
+		assert.Less(t, elapsed, delay, "request should be cancelled before full delay")
+		assert.Greater(t, elapsed, 100*time.Millisecond, "request should wait at least the context timeout")
 	})
 }
 

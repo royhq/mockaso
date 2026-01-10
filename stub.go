@@ -44,16 +44,23 @@ func (s *stub) match(r *http.Request) bool {
 	return true
 }
 
-func (s *stub) write(w http.ResponseWriter) {
-	if s.response.delay > 0 {
-		time.Sleep(s.response.delay)
-	}
-
+func (s *stub) write(w http.ResponseWriter, r *http.Request) {
 	for k, v := range s.response.headers {
 		w.Header().Set(k, v)
 	}
 
 	w.WriteHeader(s.response.statusCode)
+
+	if s.response.delay > 0 {
+		select {
+		case <-time.After(s.response.delay):
+			// Delay completed normally
+		case <-r.Context().Done():
+			// Request was cancelled, abort
+			return
+		}
+	}
+
 	_, _ = w.Write(s.response.body)
 }
 
