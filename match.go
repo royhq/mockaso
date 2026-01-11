@@ -15,9 +15,19 @@ import (
 
 type requestMatcherFunc func(*stub, *http.Request) bool
 
+// URLMatcher is a function that matches against a request URL.
+// It is the primary matching mechanism for stubs and is evaluated before
+// any StubMatcherRule functions.
+//
+// URLMatchers can extract parameters from URL patterns and store them in the
+// stub for later use with MatchParam.
 type URLMatcher func(*url.URL, *stub) bool
 
 // URL will match http request when the value specified is equals to the full request URL.
+//
+// Example:
+//
+//	server.Stub("GET", mockaso.URL("http://example.com/api/users"))
 func URL(u string) URLMatcher {
 	return func(url *url.URL, _ *stub) bool {
 		return u == url.String()
@@ -25,6 +35,10 @@ func URL(u string) URLMatcher {
 }
 
 // Path will match http request when the value specified is equals to the request URL path part.
+//
+// Example:
+//
+//	server.Stub("GET", mockaso.Path("/api/users"))
 func Path(path string) URLMatcher {
 	ensureHasNotQueryStringParams(path)
 
@@ -34,12 +48,20 @@ func Path(path string) URLMatcher {
 }
 
 // URLRegex will match http request when the regex pattern specified match to the request URL.
+//
+// Example:
+//
+//	server.Stub("GET", mockaso.URLRegex(`^http://example\.com/users/\d+$`))
 func URLRegex(pattern string) URLMatcher {
 	regex := regexp.MustCompile(pattern)
 	return func(url *url.URL, _ *stub) bool { return regex.MatchString(url.String()) }
 }
 
 // PathRegex will match http request when the regex pattern specified match to the request URL path part.
+//
+// Example:
+//
+//	server.Stub("GET", mockaso.PathRegex(`^/users/\d+$`))
 func PathRegex(pattern string) URLMatcher {
 	regex := regexp.MustCompile(pattern)
 	return func(url *url.URL, _ *stub) bool { return regex.MatchString(url.Path) }
@@ -148,11 +170,41 @@ func ensureHasNotQueryStringParams(pattern string) {
 	}
 }
 
+// StubMatcherRule is a function that returns a request matcher.
+// Multiple StubMatcherRules can be applied to a stub, and ALL must return
+// true for the stub to match the request.
+//
+// Matchers are evaluated after the URL and method match, in the order they
+// were added to the stub.
+//
+// Example:
+//
+//	server.Stub("GET", mockaso.Path("/users")).
+//		Match(
+//			mockaso.MatchHeader("Authorization", "Bearer token"),
+//			mockaso.MatchQuery("active", "true"),
+//		)
 type StubMatcherRule func() requestMatcherFunc
 
+// RequestMatcherFunc is a function that determines if an HTTP request matches
+// specific criteria. It is used to create custom matchers with MatchRequest.
+//
+// Example:
+//
+//	customMatcher := mockaso.RequestMatcherFunc(func(r *http.Request) bool {
+//		return r.ContentLength > 1024
+//	})
+//	stub.Match(mockaso.MatchRequest(customMatcher))
 type RequestMatcherFunc func(*http.Request) bool
 
 // MatchHeader sets a rule to match the http request with the given header value.
+// The match is case-sensitive for the value, but header names follow HTTP
+// canonicalization rules.
+//
+// Example:
+//
+//	server.Stub("GET", mockaso.Path("/api")).
+//		Match(mockaso.MatchHeader("Authorization", "Bearer secret-token"))
 func MatchHeader(key, value string) StubMatcherRule {
 	matcher := RequestMatcherFunc(func(r *http.Request) bool {
 		return r.Header.Get(key) == value
@@ -162,6 +214,14 @@ func MatchHeader(key, value string) StubMatcherRule {
 }
 
 // MatchQuery sets a rule to match the http request with the given query string value.
+// Only the first value is checked if the query parameter appears multiple times.
+//
+// Example:
+//
+//	server.Stub("GET", mockaso.Path("/users")).
+//		Match(mockaso.MatchQuery("status", "active"))
+//
+// This matches: GET /users?status=active
 func MatchQuery(key, value string) StubMatcherRule {
 	matcher := RequestMatcherFunc(func(r *http.Request) bool {
 		return r.URL.Query().Get(key) == value
@@ -171,7 +231,14 @@ func MatchQuery(key, value string) StubMatcherRule {
 }
 
 // MatchParam sets a rule to match the http request with the given path param value.
-// This needs that the URL must be specified with URLPattern.
+// This requires that the URL was specified with URLPattern or PathPattern.
+//
+// Example:
+//
+//	server.Stub("GET", mockaso.PathPattern("/users/{id}")).
+//		Match(mockaso.MatchParam("id", "123"))
+//
+// This matches: GET /users/123
 func MatchParam(key, value string) StubMatcherRule {
 	matcher := requestMatcherFunc(func(st *stub, r *http.Request) bool {
 		return st.patternParams[key] == value
@@ -181,6 +248,11 @@ func MatchParam(key, value string) StubMatcherRule {
 }
 
 // MatchNoBody sets a rule to match the http request with empty body.
+//
+// Example:
+//
+//	server.Stub("GET", mockaso.Path("/ping")).
+//		Match(mockaso.MatchNoBody())
 func MatchNoBody() StubMatcherRule {
 	matcher := RequestMatcherFunc(func(r *http.Request) bool {
 		realReqBody := mustReadBody(r)
@@ -191,12 +263,25 @@ func MatchNoBody() StubMatcherRule {
 }
 
 // MatchRawJSONBody sets a rule to match the http request with the given raw JSON body.
+// The JSON is compared structurally, so formatting differences are ignored.
+//
+// Example:
+//
+//	server.Stub("POST", mockaso.Path("/users")).
+//		Match(mockaso.MatchRawJSONBody(`{"name":"Alice","age":30}`))
 func MatchRawJSONBody[T string | []byte | json.RawMessage](raw T) StubMatcherRule {
 	return MatchJSONBody(json.RawMessage(raw))
 }
 
 // MatchJSONBody sets a rule to match the http request with the given JSON body.
-// The specified body will be marshaled and compared with the real body.
+// The specified body will be marshaled and compared with the actual request body.
+// JSON comparison is structural, so field order and whitespace are ignored.
+//
+// Example:
+//
+//	expectedUser := User{Name: "Alice", Age: 30}
+//	server.Stub("POST", mockaso.Path("/users")).
+//		Match(mockaso.MatchJSONBody(expectedUser))
 func MatchJSONBody(body any) StubMatcherRule {
 	data, err := json.Marshal(body)
 	if err != nil {
@@ -217,10 +302,23 @@ func MatchJSONBody(body any) StubMatcherRule {
 	return MatchRequest(matcher)
 }
 
+// BodyMatcherMapFunc is a function that validates an HTTP request body
+// represented as a map. It receives the parsed JSON body and returns true
+// if the request should match.
 type BodyMatcherMapFunc func(map[string]any) bool
 
 // MatchBodyMapFunc sets a rule to match the http request with the given matcher based on the body as a map.
 // The matcher is a func that receives the body parameters as a map. If the body is empty the map will be empty.
+//
+// This is useful for partial matching or complex validation logic.
+//
+// Example:
+//
+//	server.Stub("POST", mockaso.Path("/users")).
+//		Match(mockaso.MatchBodyMapFunc(func(body map[string]any) bool {
+//			name, ok := body["name"].(string)
+//			return ok && len(name) > 0
+//		}))
 func MatchBodyMapFunc(bodyMatcher BodyMatcherMapFunc) StubMatcherRule {
 	matcher := RequestMatcherFunc(func(r *http.Request) bool {
 		reqBody := mustReadBody(r)
@@ -241,10 +339,20 @@ func MatchBodyMapFunc(bodyMatcher BodyMatcherMapFunc) StubMatcherRule {
 	return MatchRequest(matcher)
 }
 
+// BodyMatcherStringFunc is a function that validates an HTTP request body
+// as a plain string. It receives the raw body content and returns true
+// if the request should match.
 type BodyMatcherStringFunc func(string) bool
 
 // MatchBodyStringFunc sets a rule to match the http request with the given matcher based on the body as string.
 // The matcher is a func that receives the body as plain text.
+//
+// Example:
+//
+//	server.Stub("POST", mockaso.Path("/webhook")).
+//		Match(mockaso.MatchBodyStringFunc(func(body string) bool {
+//			return strings.Contains(body, "event=created")
+//		}))
 func MatchBodyStringFunc(bodyMatcher BodyMatcherStringFunc) StubMatcherRule {
 	matcher := RequestMatcherFunc(func(r *http.Request) bool {
 		reqBody := mustReadBody(r)
@@ -255,6 +363,14 @@ func MatchBodyStringFunc(bodyMatcher BodyMatcherStringFunc) StubMatcherRule {
 }
 
 // MatchRequest sets a rule to match the http request given a custom matcher.
+// This is the most flexible matching option and allows for arbitrary request validation.
+//
+// Example:
+//
+//	server.Stub("GET", mockaso.Path("/api")).
+//		Match(mockaso.MatchRequest(func(r *http.Request) bool {
+//			return r.Header.Get("User-Agent") != ""
+//		}))
 func MatchRequest(requestMatcher RequestMatcherFunc) StubMatcherRule {
 	matcher := requestMatcherFunc(func(_ *stub, r *http.Request) bool {
 		return requestMatcher(r)
