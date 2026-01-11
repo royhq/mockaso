@@ -5,11 +5,42 @@ import (
 	"time"
 )
 
+// Stub represents a configured HTTP endpoint mock with request matching rules
+// and response configuration. It provides a fluent API for chaining matchers
+// and response rules.
+//
+// The typical usage pattern is:
+//  1. Create a stub with Server.Stub(method, urlMatcher)
+//  2. Optionally add matchers with Match(...)
+//  3. Configure the response with Respond(...)
+//
+// Example:
+//
+//	server.Stub("POST", mockaso.Path("/users")).
+//		Match(
+//			mockaso.MatchHeader("Content-Type", "application/json"),
+//			mockaso.MatchJSONBody(map[string]string{"name": "Alice"}),
+//		).
+//		Respond(
+//			mockaso.WithStatusCode(201),
+//			mockaso.WithJSON(map[string]any{"id": 123, "name": "Alice"}),
+//		)
 type Stub interface {
 	StubResponder
 	Match(...StubMatcherRule) StubResponder
 }
 
+// StubResponder provides the final step in the fluent API for configuring
+// a stub's response. After all matchers are defined, call Respond to set
+// the HTTP response that will be returned when the stub matches.
+//
+// Example:
+//
+//	stub.Respond(
+//		mockaso.WithStatusCode(200),
+//		mockaso.WithJSON(responseData),
+//		mockaso.WithHeader("X-Custom", "value"),
+//	)
 type StubResponder interface {
 	Respond(...StubResponseRule)
 }
